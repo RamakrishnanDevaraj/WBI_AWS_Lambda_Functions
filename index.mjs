@@ -8,7 +8,7 @@ const dynamoDbClient = new DynamoDBClient({ region: 'eu-north-1' });
 
 export const handler = async (event) => {
   const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-  const WHATSAPP_TOKEN = 'EAAMlO9kj5HcBOyCWWArc1Bo4kay2rNLD1bFzrjqELW38iDAJaxZAkCnwU6Xhd5srZC9eKMTHJIZBeZC0iuNFc2FFBgt0XLe8nGrgVLyKM6RENAjBbaYC4ln9Fbt89BdY0yzMAQT9bpZAHbPeVk9jDZBmdr66oGQdXTbvnwtyVCtZCJwL8mscraDPCDRfiC10oLI7UxYtb2OATK914oq';
+  const WHATSAPP_TOKEN = process.env.WHATSAPP_SECRET;
   let response;
 
   if (event?.requestContext?.http?.method === "GET") {
@@ -307,7 +307,7 @@ async function getMediaUrl(mediaId) {
     path: `/v20.0/${mediaId}`,
     method: 'GET',
     headers: {
-      'Authorization': `Bearer EAAMlO9kj5HcBOyCWWArc1Bo4kay2rNLD1bFzrjqELW38iDAJaxZAkCnwU6Xhd5srZC9eKMTHJIZBeZC0iuNFc2FFBgt0XLe8nGrgVLyKM6RENAjBbaYC4ln9Fbt89BdY0yzMAQT9bpZAHbPeVk9jDZBmdr66oGQdXTbvnwtyVCtZCJwL8mscraDPCDRfiC10oLI7UxYtb2OATK914oq`,
+      'Authorization': `Bearer ${process.env.WHATSAPP_SECRET}`,
     },
   };
 
@@ -338,7 +338,7 @@ async function downloadMedia(mediaUrl) {
     const options = {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer EAAMlO9kj5HcBOyCWWArc1Bo4kay2rNLD1bFzrjqELW38iDAJaxZAkCnwU6Xhd5srZC9eKMTHJIZBeZC0iuNFc2FFBgt0XLe8nGrgVLyKM6RENAjBbaYC4ln9Fbt89BdY0yzMAQT9bpZAHbPeVk9jDZBmdr66oGQdXTbvnwtyVCtZCJwL8mscraDPCDRfiC10oLI7UxYtb2OATK914oq`,
+        'Authorization': `Bearer ${process.env.WHATSAPP_SECRET}`,
         'User-Agent': 'waMediaRequester',
       },
     };
@@ -364,11 +364,10 @@ async function downloadMedia(mediaUrl) {
 
 // Function to create a Content Version in Salesforce using multipart/form-data
 async function createContentVersion(filename, mimeType, fileData) {
-  const instanceUrl = 'jeevantechnologies-peo--whatsapint.sandbox.my.salesforce.com';
+  const instanceUrl = process.env.SF_INSTANCE_URL;
 
   const tokenData = await getAccessTokenService();
   const accessToken = tokenData.access_token;
-  console.log('accessToken ' + accessToken);
 
   return new Promise((resolve, reject) => {
 
@@ -444,11 +443,11 @@ function buildMultipartBody(filename, mimeType, fileData) {
 const getAccessToken = () => {
   const params = new URLSearchParams({
     grant_type: 'client_credentials',
-    client_id: '3MVG9P2dNuxYp74osuStenKP_ScnyYUB4mZe2y_DpnaWpmIkJwcwIjdEJb7KfQC0aHaIWjisZQrqWsyQ2vjI6',
-    client_secret: 'D373BE497F6251081FFD6B4DC8E2D6C2F634312699A1C0297CED2E97AC6BDB22',
+    client_id: process.env.SF_CLIENT_ID,
+    client_secret: process.env.SF_CLIENT_SECRET,
   });
 
-  const { hostname, pathname } = new URL('https://jeevantechnologies-peo--whatsapint.sandbox.my.salesforce.com/services/oauth2/token');
+  const { hostname, pathname } = new URL(process.env.SF_ACCESS_TOKEN_ENDPOINT);
 
   const options = {
     hostname,
@@ -460,7 +459,6 @@ const getAccessToken = () => {
     },
   };
 
-  console.log('Request Options:', { hostname, path: pathname, options }); // Log request details
 
   return new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
@@ -468,7 +466,6 @@ const getAccessToken = () => {
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
         console.log('Response Status Code:', res.statusCode); // Log status code
-        console.log('Response Body:', body); // Log response body
         res.statusCode === 200 ?
           resolve(JSON.parse(body)) :
           reject(`Failed to get token: ${body}`);
@@ -496,7 +493,6 @@ async function getAccessTokenService() {
   
   // Check if token is still valid
   if (tokenData && new Date().getTime() < tokenData.expiryTime) {
-    console.log("Returning cached access token.");
     return tokenData.token; // Return cached token
   }
 
@@ -554,19 +550,18 @@ async function saveTokenToDynamoDB(token) {
 
 // Function to create a WhatsAppMessage record in Salesforce
 async function createWhatsAppMessages(recordData) {
-    const instanceUrl = 'jeevantechnologies-peo--whatsapint.sandbox.my.salesforce.com';
+    const instanceUrl = process.env.SF_INSTANCE_URL;
 
     const tokenData = await getAccessTokenService();
     const accessToken = tokenData.access_token;
-    console.log('createWhatsAppMessages accessToken ' + accessToken);
-
+    
     return new Promise((resolve, reject) => {
 
         const postData = JSON.stringify(recordData);
 
         const options = {
             hostname: instanceUrl,
-            path: '/services/data/v61.0/sobjects/WBI_WhatsAppMessage__c/',
+            path: '/services/data/v61.0/sobjects/'+process.env.WHATSAPP_MESSAGE_S_OBJ_NAME+'/',
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
